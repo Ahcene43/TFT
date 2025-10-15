@@ -2573,4 +2573,266 @@
     document.head.appendChild(style);
   </script>
 </body>
+  <!-- لوحة التحكم الإدارية - تظهر فقط للمسؤول -->
+<div id="adminPanel" style="display: none; position: fixed; top: 10px; right: 10px; z-index: 10000;">
+  <button onclick="toggleAdminPanel()" style="background: #ff4757; color: white; border: none; padding: 10px; border-radius: 5px;">
+    🛠️ لوحة التحكم
+  </button>
+  
+  <div id="adminContent" style="display: none; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.3); width: 400px; max-height: 80vh; overflow-y: auto; margin-top: 10px;">
+    <h3>لوحة تحكم المتجر</h3>
+    
+    <!-- قسم المنتجات -->
+    <div style="margin-bottom: 20px;">
+      <h4>إدارة المنتجات</h4>
+      <div id="productsList">
+        <!-- سيتم ملؤها ديناميكياً -->
+      </div>
+      <button onclick="addNewProduct()" style="background: #2ed573; color: white; border: none; padding: 8px 15px; border-radius: 5px; margin-top: 10px;">
+        + إضافة منتج جديد
+      </button>
+    </div>
+    
+    <!-- قسم التوصيل -->
+    <div style="margin-bottom: 20px;">
+      <h4>أسعار التوصيل</h4>
+      <select id="wilayaSelect" onchange="loadWilayaPrice()">
+        <option value="">اختر الولاية</option>
+      </select>
+      <div id="wilayaPriceForm" style="margin-top: 10px; display: none;">
+        <input type="number" id="homePrice" placeholder="سعر التوصيل للمنزل">
+        <input type="number" id="deskPrice" placeholder="سعر التوصيل للمكتب">
+        <button onclick="saveWilayaPrice()" style="background: #3742fa; color: white; border: none; padding: 5px 10px; border-radius: 5px; margin-top: 5px;">
+          حفظ
+        </button>
+      </div>
+    </div>
+    
+    <!-- قسم الخصومات -->
+    <div style="margin-bottom: 20px;">
+      <h4>إعدادات الخصم</h4>
+      <label>الحد الأدنى للخصم:</label>
+      <input type="number" id="minQuantity" value="2" style="width: 60px;">
+      <br>
+      <label>قيمة الخصم لكل قطعة:</label>
+      <input type="number" id="discountValue" value="300" style="width: 80px;">
+      <button onclick="saveDiscountSettings()" style="background: #ffa502; color: white; border: none; padding: 5px 10px; border-radius: 5px; margin-top: 5px;">
+        حفظ الخصم
+      </button>
+    </div>
+    
+    <!-- قسم المعلومات -->
+    <div style="margin-bottom: 20px;">
+      <h4>معلومات المتجر</h4>
+      <input type="text" id="storeName" placeholder="اسم المتجر" style="width: 100%; margin-bottom: 5px;">
+      <input type="text" id="storeTagline" placeholder="شعار المتجر" style="width: 100%; margin-bottom: 5px;">
+      <input type="text" id="storePhones" placeholder="أرقام الهاتف (مفصولة بفاصلة)" style="width: 100%;">
+      <button onclick="saveStoreInfo()" style="background: #5352ed; color: white; border: none; padding: 5px 10px; border-radius: 5px; margin-top: 5px;">
+        حفظ المعلومات
+      </button>
+    </div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+      <button onclick="saveAllSettings()" style="background: #2ed573; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 5px;">
+        💾 حفظ الكل
+      </button>
+      <button onclick="resetSettings()" style="background: #ff4757; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 5px;">
+        🔄 إعادة تعيين
+      </button>
+      <button onclick="exportSettings()" style="background: #3742fa; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 5px;">
+        📤 تصدير الإعدادات
+      </button>
+      <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importSettings(this)">
+      <button onclick="document.getElementById('importFile').click()" style="background: #ffa502; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 5px;">
+        📥 استيراد الإعدادات
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// كود لوحة التحكم
+function toggleAdminPanel() {
+  const content = document.getElementById('adminContent');
+  content.style.display = content.style.display === 'none' ? 'block' : 'none';
+  if (content.style.display === 'block') {
+    loadAdminPanel();
+  }
+}
+
+function loadAdminPanel() {
+  loadProductsManagement();
+  loadWilayasList();
+  loadDiscountSettings();
+  loadStoreInfo();
+}
+
+function loadProductsManagement() {
+  const container = document.getElementById('productsList');
+  container.innerHTML = '';
+  
+  Object.keys(CONFIG.PRODUCTS).forEach(id => {
+    const product = CONFIG.PRODUCTS[id];
+    container.innerHTML += `
+      <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
+        <strong>${product.name}</strong>
+        <input type="number" value="${product.price}" onchange="updateProductPrice(${id}, this.value)" 
+               style="width: 80px; margin: 0 10px;">
+        دج
+        <button onclick="removeProduct(${id})" style="background: #ff4757; color: white; border: none; padding: 2px 8px; border-radius: 3px; float: left;">
+          حذف
+        </button>
+      </div>
+    `;
+  });
+}
+
+function updateProductPrice(id, newPrice) {
+  CONFIG.PRODUCTS[id].price = parseInt(newPrice);
+}
+
+function addNewProduct() {
+  const newId = Math.max(...Object.keys(CONFIG.PRODUCTS).map(Number)) + 1;
+  CONFIG.PRODUCTS[newId] = {
+    name: `مودال ${newId}`,
+    price: 3300,
+    image: `images/modal${newId}.jpg`,
+    description: "وصف جديد"
+  };
+  loadProductsManagement();
+}
+
+function removeProduct(id) {
+  if (Object.keys(CONFIG.PRODUCTS).length > 1) {
+    delete CONFIG.PRODUCTS[id];
+    loadProductsManagement();
+  } else {
+    alert("لا يمكن حذف جميع المنتجات");
+  }
+}
+
+function loadWilayasList() {
+  const select = document.getElementById('wilayaSelect');
+  select.innerHTML = '<option value="">اختر الولاية</option>';
+  Object.keys(CONFIG.DELIVERY_PRICES).forEach(wilaya => {
+    select.innerHTML += `<option value="${wilaya}">${wilaya}</option>`;
+  });
+}
+
+function loadWilayaPrice() {
+  const wilaya = document.getElementById('wilayaSelect').value;
+  const form = document.getElementById('wilayaPriceForm');
+  
+  if (wilaya) {
+    const prices = CONFIG.DELIVERY_PRICES[wilaya];
+    document.getElementById('homePrice').value = prices.home;
+    document.getElementById('deskPrice').value = prices.desk;
+    form.style.display = 'block';
+  } else {
+    form.style.display = 'none';
+  }
+}
+
+function saveWilayaPrice() {
+  const wilaya = document.getElementById('wilayaSelect').value;
+  CONFIG.DELIVERY_PRICES[wilaya].home = parseInt(document.getElementById('homePrice').value);
+  CONFIG.DELIVERY_PRICES[wilaya].desk = parseInt(document.getElementById('deskPrice').value);
+  alert('تم حفظ سعر التوصيل');
+}
+
+function loadDiscountSettings() {
+  document.getElementById('minQuantity').value = CONFIG.DISCOUNTS.minQuantityForDiscount;
+  document.getElementById('discountValue').value = CONFIG.DISCOUNTS.discountPerItem;
+}
+
+function saveDiscountSettings() {
+  CONFIG.DISCOUNTS.minQuantityForDiscount = parseInt(document.getElementById('minQuantity').value);
+  CONFIG.DISCOUNTS.discountPerItem = parseInt(document.getElementById('discountValue').value);
+  alert('تم حفظ إعدادات الخصم');
+}
+
+function loadStoreInfo() {
+  document.getElementById('storeName').value = CONFIG.STORE_INFO.name;
+  document.getElementById('storeTagline').value = CONFIG.STORE_INFO.tagline;
+  document.getElementById('storePhones').value = CONFIG.STORE_INFO.phoneNumbers.join(', ');
+}
+
+function saveStoreInfo() {
+  CONFIG.STORE_INFO.name = document.getElementById('storeName').value;
+  CONFIG.STORE_INFO.tagline = document.getElementById('storeTagline').value;
+  CONFIG.STORE_INFO.phoneNumbers = document.getElementById('storePhones').value.split(',').map(p => p.trim());
+  updateStoreDisplay();
+  alert('تم حفظ معلومات المتجر');
+}
+
+function updateStoreDisplay() {
+  // تحديث العرض بناءً على الإعدادات الجديدة
+  document.title = `🛒 ${CONFIG.STORE_INFO.name} 🎀${CONFIG.STORE_INFO.tagline}🎀`;
+  // تحديث أرقام الهاتف في الشريط المتحرك
+  const infoBar = document.querySelector('.info-bar-content');
+  if (infoBar) {
+    infoBar.innerHTML = CONFIG.STORE_INFO.phoneNumbers.map(phone => 
+      `<i class="fas fa-phone-alt"></i> للاستفسار أطلب ${phone} `
+    ).join('').repeat(3);
+  }
+}
+
+function saveAllSettings() {
+  CONFIG.save();
+  updateStoreDisplay();
+  alert('تم حفظ جميع الإعدادات بنجاح!');
+}
+
+function resetSettings() {
+  if (confirm('هل أنت متأكد من إعادة تعيين جميع الإعدادات؟')) {
+    localStorage.removeItem('storeConfig');
+    location.reload();
+  }
+}
+
+function exportSettings() {
+  const dataStr = JSON.stringify(CONFIG, null, 2);
+  const dataBlob = new Blob([dataStr], {type: 'application/json'});
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'store-settings.json';
+  link.click();
+}
+
+function importSettings(input) {
+  const file = input.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const importedConfig = JSON.parse(e.target.result);
+        Object.assign(CONFIG, importedConfig);
+        CONFIG.save();
+        alert('تم استيراد الإعدادات بنجاح!');
+        location.reload();
+      } catch (error) {
+        alert('خطأ في ملف الإعدادات');
+      }
+    };
+    reader.readAsText(file);
+  }
+}
+
+// إظهار لوحة التحكم للمسؤول فقط (يمكن إضافة كلمة مرور)
+function showAdminPanel() {
+  const password = prompt('أدخل كلمة المرور للإدارة:');
+  if (password === 'admin123') { // يمكن تغيير كلمة المرور
+    document.getElementById('adminPanel').style.display = 'block';
+  }
+}
+
+// إخفاء لوحة التحكم بشكل افتراضي، وإظهارها بزر سري
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'F12') {
+    e.preventDefault();
+    showAdminPanel();
+  }
+});
+</script>
 </html>
